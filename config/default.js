@@ -61,10 +61,10 @@ module.exports = {
   ssltunnel: {
     enabled: true,
     registration_endpoint: 'https://api.growhub.io:8443',
-    domain: 'mozilla-iot.org',
+    domain: 'growhub.io',
     pagekite_cmd: path.normalize(path.join(process.cwd(), 'pagekite.py')),
     port: 443,
-    certemail: 'certificate@mozilla-iot.org',
+    certemail: 'monti@growcomputer.io',
   },
   bcryptRounds: 2,
   updateUrl: 'https://api.mozilla-iot.org:8443/releases',
