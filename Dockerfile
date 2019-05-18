@@ -1,47 +1,55 @@
-#!/bin/echo docker build . -f
-# -*- coding: utf-8 -*-
-#{
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/ .
-#}
-# WARNING: this docker file is *ONLY* for developer convenience
-# WARNING: for production deployment please consider supported project:
-# WARNING: https://github.com/mozilla-iot/gateway-docker
+FROM node:8-stretch
 
-FROM debian:stable
-LABEL maintainer="p.coval@samsung.com"
+EXPOSE 8080 4443
 
-ENV DEBIAN_FRONTEND noninteractive
-ENV LC_ALL en_US.UTF-8
-ENV LANG ${LC_ALL}
+RUN echo "deb http://ftp.debian.org/debian stretch-backports main" >> /etc/apt/sources.list && \
+    apt update && \
+    apt dist-upgrade -y && \
+    apt install -y \
+        build-essential \
+        ffmpeg \
+        git \
+        libcap2-bin \
+        libffi-dev \
+        libnanomsg-dev \
+        libnanomsg4 \
+        libudev-dev \
+        libusb-1.0-0-dev \
+        lsb-release \
+        pkg-config \
+        python \
+        python-pip \
+        python-setuptools \
+        python3 \
+        python3-pip \
+        python3-setuptools \
+        runit \
+        sudo \
+        udev && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    pip2 install git+https://github.com/mozilla-iot/gateway-addon-python#egg=gateway_addon && \
+    pip3 install git+https://github.com/mozilla-iot/gateway-addon-python#egg=gateway_addon && \
+    pip3 install git+https://github.com/mycroftai/adapt#egg=adapt-parser && \
+    usermod -a -G sudo,dialout node && \
+    touch /etc/inittab && \
+    echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-RUN echo "#log: Configuring locales" \
-  && set -x \
-  && apt-get update -y \
-  && apt-get install -y locales \
-  && echo "${LC_ALL} UTF-8" | tee /etc/locale.gen \
-  && locale-gen ${LC_ALL} \
-  && dpkg-reconfigure locales \
-  && sync
+ARG gateway_url
+ENV gateway_url ${gateway_url:-https://github.com/mowi22/gateway.git}
+ARG gateway_branch
+ENV gateway_branch ${gateway_branch:-master}
 
-ENV project mozilla-iot
+USER node
+WORKDIR /home/node
+RUN set -x && \
+    mkdir mozilla-iot && \
+    cd mozilla-iot && \
+    git clone --depth 1 --recursive https://github.com/mozilla-iot/intent-parser && \
+    git clone --depth 1 --recursive -b ${gateway_branch} ${gateway_url} && \
+    cd gateway && \
+    npm install
 
-RUN echo "#log: ${project}: Setup system" \
-  && set -x \
-  && apt-get update -y \
-  && apt-get install -y \
-  sudo \
-  && apt-get clean \
-  && sync
+USER root
+RUN cp /home/node/mozilla-iot/gateway/tools/udevadm /bin/udevadm
 
-ADD . /root/mozilla-iot/gateway
-WORKDIR /root/mozilla-iot/gateway/..
-RUN echo "#log: ${project}: Preparing sources" \
-  && set -x \
-  && ./gateway/install.sh \
-  && sync
-
-EXPOSE 8080
-WORKDIR /root/mozilla-iot/gateway
-CMD [ "./run-app.sh" ]
+ENTRYPOINT ["/usr/bin/runsvdir", "/etc/service"]
