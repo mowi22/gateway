@@ -48,7 +48,7 @@ domain="$(sqlite3 "${moziot_dir}/gateway/db.sqlite3" \
               "SELECT value FROM settings WHERE key='tunneltoken'" | \
           grep -oP '"name":".*?"' | \
           cut -d: -f2 | \
-          cut -d\" -f2).mozilla-iot.org"
+          cut -d\" -f2).growhub.io"
 token=$(sqlite3 "${moziot_dir}/gateway/db.sqlite3" \
             "SELECT value FROM settings WHERE key='tunneltoken'" | \
         grep -oP '"token":".*?"' | \
