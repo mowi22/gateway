@@ -64,7 +64,7 @@ module.exports = {
     domain: 'growhub.io',
     pagekite_cmd: path.normalize(path.join(process.cwd(), 'pagekite.py')),
     port: 443,
-    certemail: 'monti@growcomputer.io',
+    certemail: 'monti@growcomputer.com',
   },
   bcryptRounds: 2,
   updateUrl: 'https://api.mozilla-iot.org:8443/releases',
