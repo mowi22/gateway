@@ -4,7 +4,7 @@
 
 script_dir=$(readlink -f $(dirname "$0"))
 moziot_dir="/home/pi/mozilla-iot"
-moziot_email="certificate@mozilla-iot.org"
+moziot_email="monti@growcomputer.com"
 pagekite_pidfile="/tmp/_pagekite.pid"
 temp_dir="$(mktemp -d)"
 server_pid=""
@@ -45,7 +45,7 @@ token="$(grep -oP '"token":".*?"' "${moziot_dir}/gateway/tunneltoken" | \
          cut -d: -f2 | \
          sed 's/"//g')"
 
-if [ "${domain}" = ".mozilla-iot.org" -o -z "${token}" ]; then
+if [ "${domain}" = ".growhub.io" -o -z "${token}" ]; then
     abort "Could not determine domain or token."
 fi
 
@@ -130,7 +130,7 @@ cp "${moziot_dir}/etc/live/${domain}/chain.pem" \
     "${moziot_dir}/gateway/chain.pem"
 
 echo "Registering domain with server."
-curl "https://api.mozilla-iot.org:8443/setemail" \
+curl "https://api.growhub.io:8443/setemail" \
     -s -G \
     --data-urlencode "token=${token}" \
     --data-urlencode "email=${email}" || abort "Failed to register."
