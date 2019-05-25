@@ -48,14 +48,14 @@ domain="$(sqlite3 "${moziot_dir}/gateway/db.sqlite3" \
               "SELECT value FROM settings WHERE key='tunneltoken'" | \
           grep -oP '"name":".*?"' | \
           cut -d: -f2 | \
-          cut -d\" -f2).growhub.io"
+          cut -d\" -f2).mozilla-iot.org"
 token=$(sqlite3 "${moziot_dir}/gateway/db.sqlite3" \
             "SELECT value FROM settings WHERE key='tunneltoken'" | \
         grep -oP '"token":".*?"' | \
         cut -d: -f2 | \
         cut -d\" -f2)
 
-if [ "${domain}" = ".growhub.io" -o -z "${token}" ]; then
+if [ "${domain}" = ".mozilla-iot.org" -o -z "${token}" ]; then
     abort "Could not determine domain or token."
 fi
 
@@ -148,7 +148,7 @@ else
 fi
 
 echo "Registering domain with server."
-curl "https://api.growhub.io:8443/setemail" \
+curl "https://api.mozilla-iot.org:8443/setemail" \
     -s -G \
     --data-urlencode "token=${token}" \
     --data-urlencode "email=${email}" || abort "Failed to register."
