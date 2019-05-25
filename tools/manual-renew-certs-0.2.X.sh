@@ -40,7 +40,7 @@ fi
 
 domain="$(grep -oP '"name":".*?"' "${moziot_dir}/gateway/tunneltoken" | \
           cut -d: -f2 | \
-          sed 's/"//g').mozilla-iot.org"
+          sed 's/"//g').growhub.io"
 token="$(grep -oP '"token":".*?"' "${moziot_dir}/gateway/tunneltoken" | \
          cut -d: -f2 | \
          sed 's/"//g')"
