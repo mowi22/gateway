@@ -1,4 +1,4 @@
-FROM node:8-stretch
+FROM mwillis22/growhub-gateway:latest
 
 EXPOSE 8080 4443
 
