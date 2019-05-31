@@ -59,7 +59,7 @@ module.exports = {
     defaultUser: null,
   },
   ssltunnel: {
-    enabled: true,
+    enabled: false,
     registration_endpoint: 'https://api.growhub.io:8443',
     domain: 'growhub.io',
     pagekite_cmd: path.normalize(path.join(process.cwd(), 'pagekite.py')),
