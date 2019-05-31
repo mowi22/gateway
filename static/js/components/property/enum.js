@@ -29,7 +29,7 @@ class EnumProperty extends BaseComponent {
       height: 10rem;
       border-radius: 5rem;
       border: 0.2rem solid white;
-      background-color: #89b6d6;
+      background-color: #484848;
       position: relative;
     }
 
@@ -62,7 +62,7 @@ class EnumProperty extends BaseComponent {
       text-align: center;
       max-width: 10rem;
       overflow-wrap: break-word;
-      background-color: #5d9bc7;
+      background-color: #000000;
       display: inline-block;
     }
   </style>

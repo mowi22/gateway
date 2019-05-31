@@ -33,7 +33,7 @@ class ImageProperty extends BaseComponent {
       background-size: 3.2rem;
       background-repeat: no-repeat;
       transform: translate(0);
-      background-color: #89b6d6;
+      background-color: #484848;
       background-image: url('/optimized-images/component-icons/image.svg');
       background-position: center;
       position: relative;
@@ -44,7 +44,7 @@ class ImageProperty extends BaseComponent {
       text-align: center;
       max-width: 10rem;
       overflow-wrap: break-word;
-      background-color: #5d9bc7;
+      background-color: #000000;
       display: inline-block;
     }
   </style>

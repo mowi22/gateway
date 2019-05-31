@@ -31,7 +31,7 @@ template.innerHTML = `
       border-radius: 6.4rem;
       border: 0.2rem solid white;
       transform: translate(0);
-      background-color: #89b6d6;
+      background-color: #484848;
     }
 
     .webthing-light-capability-container.on {

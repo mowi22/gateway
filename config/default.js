@@ -40,7 +40,7 @@ module.exports = {
     defaults: {
       domain: {
         localAccess: true,
-        mozillaTunnelService: false,
+        mozillaTunnelService: true,
         localControl: {
           mdnsServiceType: 'http',
           mdnsServiceName: 'Mozilla WebThings Gateway',
@@ -59,12 +59,12 @@ module.exports = {
     defaultUser: null,
   },
   ssltunnel: {
-    enabled: false,
-    registration_endpoint: 'https://api.growhub.io:8443',
-    domain: 'growhub.io',
+    enabled: true,
+    registration_endpoint: 'https://api.mozilla-iot.org:8443',
+    domain: 'mozilla-iot.org',
     pagekite_cmd: path.normalize(path.join(process.cwd(), 'pagekite.py')),
     port: 443,
-    certemail: 'monti@growcomputer.com',
+    certemail: 'certificate@mozilla-iot.org',
   },
   bcryptRounds: 2,
   updateUrl: 'https://api.mozilla-iot.org:8443/releases',

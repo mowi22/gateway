@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #settings-view {
-  background-color: #5d9bc7;
+  background-color: #000000;
   height: 100%;
   box-sizing: border-box;
   overflow: hidden;
@@ -78,7 +78,7 @@
   margin: 0;
   padding: 0;
   list-style-type: none;
-  background-color: #48779a;
+  background-color: #1d1d1d;
   border-radius: 0.5rem;
   background-image: url('../optimized-images/right-arrow.png');
   background-size: auto 2rem;
@@ -178,7 +178,7 @@
 .settings-container {
   position: relative;
   color: #fff;
-  background-color: #48779a;
+  background-color: #1d1d1d;
   border-radius: 0.5rem;
   padding: 2rem;
   color: #fff;
@@ -276,7 +276,7 @@
   font-size: 1.8rem;
   padding: 2rem 2rem 2rem 5.5rem;
   list-style-type: none;
-  background-color: #48779a;
+  background-color: #1d1d1d;
   color: #fff;
   border-radius: 0.5rem;
   background-position: 1rem;
@@ -307,7 +307,7 @@
 .addon-item,
 .authorization-item,
 .domain-item {
-  background-color: #5288af;
+  background-color: #1d1d1d;
 }
 
 .network-item {
@@ -486,7 +486,7 @@
 .addon-settings-enable,
 .addon-settings-remove,
 .domain-settings-update {
-  background-color: #48779a;
+  background-color: #1d1d1d;
 }
 
 .addon-discovery-settings-add {
@@ -716,7 +716,7 @@
   font-size: 1.8rem;
   top: 50%;
   transform: translateY(-50%);
-  background-color: #48779a;
+  background-color: #1d1d1d;
 
   background-image: url('../optimized-images/stop-16.svg');
   background-position: 1rem;

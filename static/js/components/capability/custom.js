@@ -30,7 +30,7 @@ template.innerHTML = `
       background-size: 12.8rem;
       background-repeat: no-repeat;
       transform: translate(0);
-      background-color: #5d9bc7;
+      background-color: #000000;
     }
 
     .webthing-custom-capability-icon.custom-icon {
@@ -39,7 +39,7 @@ template.innerHTML = `
       border: 0.2rem solid white;
       background-size: 6.4rem;
       background-position: center;
-      background-color: #89b6d6;
+      background-color: #484848;
     }
   </style>
   <div id="icon" class="webthing-custom-capability-icon"></div>
