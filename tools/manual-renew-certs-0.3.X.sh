@@ -4,7 +4,7 @@
 
 script_dir=$(readlink -f $(dirname "$0"))
 moziot_dir="/home/pi/mozilla-iot"
-moziot_email="monti@growcomputer.com"
+moziot_email="certificate@mozilla-iot.org"
 pagekite_pidfile="/tmp/_pagekite.pid"
 temp_dir="$(mktemp -d)"
 server_pid=""
