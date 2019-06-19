@@ -39,7 +39,7 @@ module.exports = {
   settings: {
     defaults: {
       domain: {
-        localAccess: false,
+        localAccess: true,
         mozillaTunnelService: false,
         localControl: {
           mdnsServiceType: 'http',
