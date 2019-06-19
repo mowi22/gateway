@@ -56,7 +56,7 @@ module.exports = {
     },
   },
   authentication: {
-    defaultUser: admin,
+    defaultUser: null,
   },
   ssltunnel: {
     enabled: false,
