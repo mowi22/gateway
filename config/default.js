@@ -56,7 +56,10 @@ module.exports = {
     },
   },
   authentication: {
-    defaultUser: null,
+    defaultUser:{
+      email: "admin@growcomputer.com"
+      name: "admin"
+      password: "admin"},
   },
   ssltunnel: {
     enabled: false,
