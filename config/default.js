@@ -40,7 +40,7 @@ module.exports = {
     defaults: {
       domain: {
         localAccess: true,
-        mozillaTunnelService: true,
+        mozillaTunnelService: false,
         localControl: {
           mdnsServiceType: 'http',
           mdnsServiceName: 'Mozilla WebThings Gateway',
@@ -56,10 +56,10 @@ module.exports = {
     },
   },
   authentication: {
-    defaultUser: null,
+    defaultUser:false,
   },
   ssltunnel: {
-    enabled: true,
+    enabled: false,
     registration_endpoint: 'https://api.mozilla-iot.org:8443',
     domain: 'mozilla-iot.org',
     pagekite_cmd: path.normalize(path.join(process.cwd(), 'pagekite.py')),

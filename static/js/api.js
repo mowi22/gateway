@@ -8,7 +8,7 @@
 'use strict';
 
 const API = {
-  jwt: localStorage.getItem('jwt'),
+  jwt: 12345678910,
 
   isLoggedIn() {
     return !!this.jwt;

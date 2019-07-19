@@ -53,7 +53,7 @@ html, body {
 
 body {
   padding: 0;
-  background-color: #5d9bc7;
+  background-color: #000000;
   overflow: hidden;
   -webkit-overflow-scrolling: touch;
 }
@@ -121,7 +121,7 @@ input[type="email"] {
   height: 5.6rem;
   border-radius: 2.8rem;
   padding: 0;
-  background-color: #5d9bc7;
+  background-color: #000000;
   border: none;
   background-size: cover;
   background-repeat: no-repeat;
@@ -267,7 +267,7 @@ h1, h2, h3, h4, h5, h6 {
   position: fixed;
   bottom: 9rem;
   right: 3rem;
-  background-color: #5288af;
+  background-color: #1d1d1d;
   color: white;
   padding: 1rem 0;
   border-radius: 0.5rem;
@@ -308,7 +308,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 #overflow-menu > a:active {
-  background-color: #48779a;
+  background-color: #1d1d1d;
 }
 
 #overflow-menu > a > img {
@@ -349,7 +349,7 @@ h1, h2, h3, h4, h5, h6 {
   width: 5.5rem;
   height: 2.2rem;
   border-radius: 1.1rem;
-  background: #5d9bc7;
+  background: #000000;
   transition: 0.1s;
 }
 

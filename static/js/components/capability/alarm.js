@@ -31,7 +31,7 @@ template.innerHTML = `
       background-size: 6.4rem;
       background-repeat: no-repeat;
       transform: translate(0);
-      background-color: #89b6d6;
+      background-color: #484848;
       background-image: url('/optimized-images/component-icons/alarm-ok.svg');
       background-position: center 2rem;
     }

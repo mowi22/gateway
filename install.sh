@@ -38,7 +38,7 @@ sudo setcap cap_net_raw+eip $(eval readlink -f `which node`)
 
 # Download and install the required node modules
 if [ ! -d "gateway" ]; then
-    git clone https://github.com/moziot/gateway.git
+    git clone https://github.com/mowi22/gateway.git
 fi
 cd gateway
 npm install .

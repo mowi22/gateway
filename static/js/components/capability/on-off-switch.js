@@ -30,7 +30,7 @@ template.innerHTML = `
       background-size: 12.8rem;
       background-repeat: no-repeat;
       transform: translate(0);
-      background-color: #5d9bc7;
+      background-color: #000000;
       background-image: url('/optimized-images/component-icons/on-off-switch.png');
     }
 
