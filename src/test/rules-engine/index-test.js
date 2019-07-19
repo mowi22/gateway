@@ -20,7 +20,7 @@ const {
 
 const thingLight1 = {
   id: 'light1',
-  name: 'light1',
+  title: 'light1',
   type: 'onOffSwitch',
   '@context': 'https://iot.mozilla.org/schemas',
   '@type': ['OnOffSwitch'],
@@ -44,7 +44,7 @@ const thingLight1 = {
 
 const thingLight2 = {
   id: 'light2',
-  name: 'light2',
+  title: 'light2',
   type: 'onOffSwitch',
   '@context': 'https://iot.mozilla.org/schemas',
   '@type': ['OnOffSwitch'],
@@ -58,7 +58,7 @@ const thingLight2 = {
 
 const thingLight3 = {
   id: 'light3',
-  name: 'light3',
+  title: 'light3',
   type: 'onOffSwitch',
   '@context': 'https://iot.mozilla.org/schemas',
   '@type': ['OnOffSwitch'],
@@ -72,6 +72,7 @@ const thingLight3 = {
 };
 
 const testRule = {
+  name: 'testRule',
   enabled: true,
   trigger: {
     property: {
@@ -94,6 +95,7 @@ const testRule = {
 };
 
 const offRule = {
+  name: 'offRule',
   enabled: true,
   trigger: {
     property: {
@@ -203,7 +205,7 @@ const equalityRule = {
 
 const complexTriggerRule = {
   enabled: true,
-  name: 'Equality Rule',
+  name: 'Complex Trigger Rule',
   trigger: {
     type: 'MultiTrigger',
     op: 'AND',
@@ -550,9 +552,7 @@ describe('rules engine', () => {
   }
 
   it('creates and simulates an off rule', async () => {
-    // Both lights are on, light1 is turned off, turning light2 off. light2 is
-    // turned on, light1 is turned off (double activation), turning light2 off.
-    // light1 is turned on, turning light2 on.
+    // Both lights are on, light1 is turned off, turning light2 off
 
     await setOn(thingLight1.id, true);
     await setOn(thingLight2.id, true);
@@ -565,14 +565,6 @@ describe('rules engine', () => {
     expect(res.status).toEqual(200);
     expect(res.body).toHaveProperty('id');
     const ruleId = res.body.id;
-
-    await setOn(thingLight1.id, false);
-    await waitForExpect(async () => {
-      expect(await getOn(thingLight2.id)).toEqual(false);
-    });
-
-    await setOn(thingLight2.id, true);
-    expect(await getOn(thingLight2.id)).toEqual(true);
 
     await setOn(thingLight1.id, false);
     await waitForExpect(async () => {

@@ -103,11 +103,22 @@ function createHttpsServer() {
   return https.createServer(options);
 }
 
+let httpsAttempts = 5;
 function startHttpsGateway() {
   const port = config.get('ports.https');
 
   if (!servers.https) {
     servers.https = createHttpsServer();
+    if (!servers.https) {
+      httpsAttempts -= 1;
+      if (httpsAttempts < 0) {
+        console.error('Unable to create HTTPS server after several tries');
+        gracefulExit();
+        process.exit(0);
+      }
+      setTimeout(startHttpsGateway, 4000);
+      return;
+    }
   }
 
   httpsApp = createGatewayApp(servers.https);
@@ -245,7 +256,13 @@ function rulesEngineConfigure(server) {
 
 function createApp() {
   const app = express();
-  app.engine('handlebars', expressHandlebars());
+  app.engine(
+    'handlebars',
+    expressHandlebars({
+      defaultLayout: undefined, // eslint-disable-line no-undefined
+      layoutsDir: Constants.VIEWS_PATH,
+    })
+  );
   app.set('view engine', 'handlebars');
   app.set('views', Constants.VIEWS_PATH);
 
@@ -377,6 +394,17 @@ function startGateway() {
   }
 }
 
+function gracefulExit() {
+  addonManager.unloadAddons();
+  mDNSserver.server.cleanup();
+  TunnelService.stop();
+
+  if (updaterInterval !== null) {
+    clearInterval(updaterInterval);
+    updaterInterval = null;
+  }
+}
+
 if (config.get('cli')) {
   // Get some decent error messages for unhandled rejections. This is
   // often just errors in the code.
@@ -387,16 +415,8 @@ if (config.get('cli')) {
 
   // Do graceful shutdown when Control-C is pressed.
   process.on('SIGINT', () => {
-    console.log('Control-C: unloading add-ons...');
-    addonManager.unloadAddons();
-    mDNSserver.server.cleanup();
-    TunnelService.stop();
-
-    if (updaterInterval !== null) {
-      clearInterval(updaterInterval);
-      updaterInterval = null;
-    }
-
+    console.log('Control-C: Exiting gracefully');
+    gracefulExit();
     process.exit(0);
   });
 }
@@ -404,6 +424,11 @@ if (config.get('cli')) {
 // function to stop running server and start https
 TunnelService.switchToHttps = () => {
   stopHttpGateway();
+
+  if (platform.getOS() === 'linux-openwrt') {
+    RouterSetupApp.onSetupComplete();
+  }
+
   startHttpsGateway().then((server) => {
     TunnelService.setServerHandle(server);
   });
@@ -426,7 +451,8 @@ mDNSserver.getmDNSstate().then((state) => {
   }
 });
 
-module.exports = { // for testing
+// for testing
+module.exports = {
   servers,
   serverStartup,
 };

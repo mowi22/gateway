@@ -17,7 +17,8 @@
   box-sizing: border-box;
   width: 100%;
   min-height: 9.6rem;
-  padding: 0 9.6rem;
+  padding: 0;
+  padding-left: 9.6rem;
   display: flex;
   box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
   z-index: 10;
@@ -43,14 +44,11 @@
   background: #777;
 }
 
-.title-bar.invalid > .rule-preview-button {
-  display: none;
-}
-
 .rule-preview-button {
   top: 2rem;
   right: 2rem;
   background-image: url('../optimized-images/play.svg');
+  display: none;
 }
 
 .rule-preview-button.stop {
@@ -223,7 +221,9 @@
   overflow: visible;
 }
 
-.property-select-option.selected, .message-input-container {
+.property-select-option.selected,
+.property-select-option.open-button,
+.message-input-container {
   position: relative;
   border-radius: 0 0 1rem 0;
 }
@@ -239,7 +239,8 @@
   border-radius: 0;
 }
 
-.property-select-option.selected:after {
+.property-select-option.selected:after,
+.property-select-option.open-button:after {
   content: "";
   position: absolute;
   right: 0;
@@ -258,6 +259,7 @@
 
 .property-select.open > .property-select-option,
 .property-select-option.selected,
+.property-select-option.open-button,
 .message-input-container {
   display: flex;
   align-items: center;
@@ -275,7 +277,7 @@
 
 .property-select-option input[type="text"],
 .message-input-container input[type="text"] {
-  width: 8rem;
+  width: 7rem;
 }
 
 .property-select-option input[type="number"],
@@ -289,8 +291,17 @@
   font-size: 1.6rem;
 }
 
+.property-select-option select {
+  width: auto;
+  flex: 1;
+}
+
 .property-select-option input[type="number"] {
   padding: 0.2rem;
+}
+
+.property-select.open > .property-select-option.open-button {
+  display: none;
 }
 
 .dragging {

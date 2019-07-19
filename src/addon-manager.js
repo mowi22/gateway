@@ -53,6 +53,8 @@ class AddonManager extends EventEmitter {
     this.installedAddons = new Set();
     this.deferredWaitForAdapter = new Map();
     this.pluginServer = null;
+    this.updateTimeout = null;
+    this.updateInterval = null;
   }
 
   /**
@@ -831,12 +833,13 @@ class AddonManager extends EventEmitter {
 
     if (process.env.NODE_ENV !== 'test') {
       // Check for add-ons in 10 seconds (allow add-ons to load first).
-      setTimeout(() => {
+      this.updateTimeout = setTimeout(() => {
         this.updateAddons();
+        this.updateTimeout = null;
 
         // Check every day.
         const delay = 24 * 60 * 60 * 1000;
-        setInterval(this.updateAddons, delay);
+        this.updateInterval = setInterval(this.updateAddons.bind(this), delay);
       }, 10000);
     }
   }
@@ -898,6 +901,15 @@ class AddonManager extends EventEmitter {
     }
 
     this.addonsLoaded = false;
+
+    if (this.updateTimeout) {
+      clearTimeout(this.updateTimeout);
+    }
+
+    if (this.updateInterval) {
+      clearInterval(this.updateInterval);
+    }
+
     return Promise.all(unloadPromises).then(() => {
       if (this.pluginServer) {
         this.pluginServer.shutdown();

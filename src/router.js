@@ -91,6 +91,7 @@ const Router = {
       // or is a WebSocket request, or is multipart/form-data
       // treat it as an API request
       } else if (!request.accepts('html') && request.accepts('json') ||
+                 request.headers['content-type'] === 'application/json' ||
                  request.get('Upgrade') === 'websocket' ||
                  request.is('multipart/form-data') ||
                  request.path.startsWith(Constants.ADDONS_PATH) ||
@@ -164,6 +165,8 @@ const Router = {
             require('./controllers/push_controller'));
     app.use(API_PREFIX + Constants.LOGS_PATH, nocache, auth,
             require('./controllers/logs_controller'));
+    app.use(API_PREFIX + Constants.NOTIFIERS_PATH, nocache, auth,
+            require('./controllers/notifiers_controller'));
 
     app.use(API_PREFIX + Constants.OAUTH_PATH, nocache,
             require('./controllers/oauth_controller').default);

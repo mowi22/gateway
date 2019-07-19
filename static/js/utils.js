@@ -171,6 +171,12 @@ const Utils = {
       case 'metres':
         return 'm';
 
+      case 'kilometer':
+      case 'kilometers':
+      case 'kilometre':
+      case 'kilometres':
+        return 'km';
+
       case 'day':
       case 'days':
         return 'd';
@@ -190,6 +196,10 @@ const Utils = {
       case 'millisecond':
       case 'milliseconds':
         return 'ms';
+
+      case 'foot':
+      case 'feet':
+        return 'ft';
 
       default:
         return unit;
