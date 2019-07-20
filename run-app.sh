@@ -27,13 +27,14 @@ fi
 run_app() {
   export NVM_DIR="$HOME/.nvm"
   [ ! -s "$NVM_DIR/nvm.sh" ] || \. "$NVM_DIR/nvm.sh"  # This loads nvm
-
-  if [ ! is_docker_container ]; then
-    sudo /sbin/ldconfig
+  
+  sudo /sbin/ldconfig
+  # if [ ! is_docker_container ]; then
+  #   sudo /sbin/ldconfig
   ### removed temporarily to fix docker containers ###
   # else
   #   /sbin/ldconfig
-  fi
+  # fi
 
 
   echo "nvm version"
