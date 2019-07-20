@@ -32,8 +32,8 @@ run_app() {
   if [ ! is_docker_container ]; then
     sudo /sbin/ldconfig
   ### removed temporarily to fix docker containers ###
-  else
-    /sbin/ldconfig
+  # else
+  #   /sbin/ldconfig
   fi
 
 
