@@ -40,7 +40,7 @@ module.exports = {
     defaults: {
       domain: {
         localAccess: true,
-        mozillaTunnelService: false,
+        mozillaTunnelService: true,
         localControl: {
           mdnsServiceType: 'http',
           mdnsServiceName: 'Mozilla WebThings Gateway',
@@ -56,7 +56,7 @@ module.exports = {
     },
   },
   authentication: {
-    defaultUser:null,
+    defaultUser:true,
   },
   ssltunnel: {
     enabled: false,
