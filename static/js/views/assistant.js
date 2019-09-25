@@ -64,15 +64,15 @@ const AssistantScreen = {
       for (const type of types) {
         switch (type) {
           case 'OnOffSwitch':
-            commands.push(`Turn the ${thingDescr.name} on`);
+            commands.push(`Turn the ${thingDescr.title} on`);
             break;
           case 'Light':
             if (thingDescr.properties.level) {
-              commands.push(`Dim the ${thingDescr.name}`);
+              commands.push(`Dim the ${thingDescr.title}`);
             }
             break;
           case 'ColorControl':
-            commands.push(`Turn the ${thingDescr.name} red`);
+            commands.push(`Turn the ${thingDescr.title} red`);
             break;
         }
       }
@@ -108,37 +108,41 @@ const AssistantScreen = {
         throw new Error(error);
       }
 
-      let verb, preposition = '';
-      switch (body.payload.keyword) {
-        case 'make':
-          verb = 'making';
-          break;
-        case 'change':
-          verb = 'changing';
-          break;
-        case 'set':
-          verb = 'setting';
-          preposition = 'to ';
-          break;
-        case 'dim':
-          verb = 'dimming';
-          preposition = 'by ';
-          break;
-        case 'brighten':
-          verb = 'brightening';
-          preposition = 'by ';
-          break;
-        case 'turn':
-        case 'switch':
-        default:
-          verb = `${body.payload.keyword}ing`;
-          break;
+      let message = body.message;
+
+      if (!message) {
+        let verb, preposition = '';
+        switch (body.payload.keyword) {
+          case 'make':
+            verb = 'making';
+            break;
+          case 'change':
+            verb = 'changing';
+            break;
+          case 'set':
+            verb = 'setting';
+            preposition = 'to ';
+            break;
+          case 'dim':
+            verb = 'dimming';
+            preposition = 'by ';
+            break;
+          case 'brighten':
+            verb = 'brightening';
+            preposition = 'by ';
+            break;
+          case 'turn':
+          case 'switch':
+          default:
+            verb = `${body.payload.keyword}ing`;
+            break;
+        }
+
+        const value = body.payload.value ? body.payload.value : '';
+
+        message =
+          `OK, ${verb} the ${body.payload.thing} ${preposition}${value}.`;
       }
-
-      const value = body.payload.value ? body.payload.value : '';
-
-      const message =
-        `OK, ${verb} the ${body.payload.thing} ${preposition}${value}.`;
       this.displayMessage(
         message,
         'incoming'

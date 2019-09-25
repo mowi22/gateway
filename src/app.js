@@ -40,6 +40,7 @@ const mDNSserver = require('./mdns-server');
 const Logs = require('./models/logs');
 const platform = require('./platform');
 const Router = require('./router');
+const sleep = require('./sleep');
 const TunnelService = require('./ssltunnel');
 const {RouterSetupApp, isRouterConfigured} = require('./router-setup');
 const {WiFiSetupApp, isWiFiConfigured} = require('./wifi-setup');
@@ -116,8 +117,8 @@ function startHttpsGateway() {
         gracefulExit();
         process.exit(0);
       }
-      setTimeout(startHttpsGateway, 4000);
-      return;
+
+      return sleep(4000).then(startHttpsGateway);
     }
   }
 
@@ -172,6 +173,7 @@ function startHttpGateway() {
 
 function stopHttpGateway() {
   servers.http.removeListener('request', httpApp);
+  servers.http.close();
 }
 
 function startWiFiSetup() {
@@ -375,12 +377,18 @@ switch (platform.getOS()) {
 function startGateway() {
   // if we have the certificates installed, we start https
   if (TunnelService.hasCertificates()) {
-    serverStartup.promise = TunnelService.userSkipped().then((res) => {
-      if (res) {
-        return startHttpGateway();
+    serverStartup.promise = TunnelService.userSkipped().then((skipped) => {
+      const promise = startHttpsGateway();
+
+      // if the user opted to skip the tunnel, but still has certificates, go
+      // ahead and start up the https server.
+      if (skipped) {
+        return promise;
       }
 
-      return startHttpsGateway().then((server) => {
+      // if they did not opt to skip, check if they have a tunnel token. if so,
+      // start the tunnel.
+      return promise.then((server) => {
         TunnelService.hasTunnelToken().then((result) => {
           if (result) {
             TunnelService.setServerHandle(server);
@@ -424,11 +432,6 @@ if (config.get('cli')) {
 // function to stop running server and start https
 TunnelService.switchToHttps = () => {
   stopHttpGateway();
-
-  if (platform.getOS() === 'linux-openwrt') {
-    RouterSetupApp.onSetupComplete();
-  }
-
   startHttpsGateway().then((server) => {
     TunnelService.setServerHandle(server);
   });

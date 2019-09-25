@@ -23,13 +23,15 @@ const rimraf = require('rimraf');
 
 const Profile = {
   init: function() {
-    this.baseDir = process.env.MOZIOT_HOME || config.get('profileDir');
+    this.baseDir = path.resolve(
+      process.env.MOZIOT_HOME || config.get('profileDir')
+    );
     this.configDir = path.join(this.baseDir, 'config');
     this.sslDir = path.join(this.baseDir, 'ssl');
     this.uploadsDir = path.join(this.baseDir, 'uploads');
     this.mediaDir = path.join(this.baseDir, 'media');
     this.logDir = path.join(this.baseDir, 'log');
-    this.gatewayDir = path.join(__dirname, '..');
+    this.gatewayDir = path.resolve(path.join(__dirname, '..'));
 
     if (process.env.NODE_ENV === 'test') {
       this.addonsDir = path.join(this.gatewayDir, 'src', 'addons-test');
@@ -227,6 +229,31 @@ const Profile = {
 
     if (fs.existsSync(oldLocalConfigPath)) {
       fs.unlinkSync(oldLocalConfigPath);
+    }
+
+    // Handle any config migrations
+    if (fs.existsSync(userConfigPath)) {
+      const cfg = JSON.parse(fs.readFileSync(userConfigPath));
+      let changed = false;
+
+      // addonManager.listUrl -> addonManager.listUrls
+      if (cfg.hasOwnProperty('addonManager') &&
+          cfg.addonManager.hasOwnProperty('listUrl')) {
+        if (cfg.addonManager.hasOwnProperty('listUrls')) {
+          cfg.addonManager.listUrls.push(cfg.addonManager.listUrl);
+          cfg.addonManager.listUrls =
+            Array.from(new Set(cfg.addonManager.listUrls));
+        } else {
+          cfg.addonManager.listUrls = [cfg.addonManager.listUrl];
+        }
+
+        delete cfg.addonManager.listUrl;
+        changed = true;
+      }
+
+      if (changed) {
+        fs.writeFileSync(userConfigPath, JSON.stringify(cfg, null, 2));
+      }
     }
 
     const localConfig = config.util.parseFile(userConfigPath);

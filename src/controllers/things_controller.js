@@ -24,6 +24,14 @@ const WebSocket = require('ws');
 const ThingsController = PromiseRouter();
 
 /**
+ * Connect to receive messages from a Thing or all Things
+ *
+ * Note that these must precede the normal routes to allow express-ws to work
+ */
+ThingsController.ws('/:thingId/', websocketHandler);
+ThingsController.ws('/', websocketHandler);
+
+/**
  * Get a list of Things.
  */
 ThingsController.get('/', (request, response) => {
@@ -383,10 +391,7 @@ ThingsController.delete('/:thingId', (request, response) => {
     });
 });
 
-/**
- * Connect to receive messages from a Thing
- */
-ThingsController.ws('/:thingId/', (websocket, request) => {
+function websocketHandler(websocket, request) {
   // Since the Gateway have the asynchronous express middlewares, there is a
   // possibility that the WebSocket have been closed.
   if (websocket.readyState !== WebSocket.OPEN) {
@@ -395,8 +400,19 @@ ThingsController.ws('/:thingId/', (websocket, request) => {
   const thingId = request.params.thingId;
   const subscribedEventNames = {};
 
-  function sendMessage(message) {
-    websocket.send(message, (err) => {
+  async function sendMessage(message) {
+    // Convert from internal id to external id
+    if (message.hasOwnProperty('id')) {
+      try {
+        const descr = await Things.getThingDescription(message.id,
+                                                       request.get('Host'),
+                                                       request.secure);
+        message.id = descr.id;
+      } catch (_e) {
+        return;
+      }
+    }
+    websocket.send(JSON.stringify(message), (err) => {
       if (err) {
         console.error(`WebSocket sendMessage failed: ${err}`);
       }
@@ -404,65 +420,112 @@ ThingsController.ws('/:thingId/', (websocket, request) => {
   }
 
   function onPropertyChanged(property) {
-    if (property.device.id !== thingId) {
+    if (typeof thingId !== 'undefined' && property.device.id !== thingId) {
       return;
     }
-    sendMessage(JSON.stringify({
+    sendMessage({
+      id: property.device.id,
       messageType: Constants.PROPERTY_STATUS,
       data: {
         [property.name]: property.value,
       },
-    }));
+    });
   }
 
   function onActionStatus(action) {
-    sendMessage(JSON.stringify({
+    if (action.hasOwnProperty('thingId') &&
+        typeof thingId !== 'undefined' &&
+        action.thingId !== thingId) {
+      return;
+    }
+
+    const message = {
       messageType: Constants.ACTION_STATUS,
       data: {
         [action.name]: action.getDescription(),
       },
-    }));
+    };
+    if (action.hasOwnProperty('thingId')) {
+      message.id = action.thingId;
+    }
+    sendMessage(message);
   }
 
   function onEvent(event) {
+    if (typeof thingId !== 'undefined' && event.thingId !== thingId) {
+      return;
+    }
     if (!subscribedEventNames[event.name]) {
       return;
     }
-    sendMessage(JSON.stringify({
+    sendMessage({
+      id: event.thingId,
       messageType: Constants.EVENT,
       data: {
         [event.name]: event.getDescription(),
       },
-    }));
+    });
   }
 
-  function onConnected(connected) {
-    sendMessage(JSON.stringify({
+  function onConnected(id, connected) {
+    sendMessage({
+      id,
       messageType: Constants.CONNECTED,
       data: connected,
-    }));
+    });
   }
 
-  Things.getThing(thingId).then((thing) => {
-    thing.registerWebsocket(websocket);
+  let thingCleanups = {};
+  function addThing(thing) {
     thing.addEventSubscription(onEvent);
-    thing.addConnectedSubscription(onConnected);
+    const onConn = onConnected.bind(null, thing.id);
+    thing.addConnectedSubscription(onConn);
+    const onRem = () => {
+      if (thingCleanups[thing.id]) {
+        thingCleanups[thing.id]();
+        delete thingCleanups[thing.id];
+      }
+      if (typeof thingId !== 'undefined' &&
+          (websocket.readyState === WebSocket.OPEN ||
+           websocket.readyState === WebSocket.CONNECTING)) {
+        websocket.close();
+      }
+    };
+    thing.addRemovedSubscription(onRem);
 
-    websocket.on('close', () => {
+    const thingCleanup = () => {
       thing.removeEventSubscription(onEvent);
-      thing.removeConnectedSubscription(onConnected);
+      thing.removeConnectedSubscription(onConn);
+      thing.removeRemovedSubscription(onRem);
+    };
+    thingCleanups[thing.id] = thingCleanup;
+  }
+
+  function onThingAdded(thing) {
+    addThing(thing);
+  }
+
+  if (typeof thingId !== 'undefined') {
+    Things.getThing(thingId).then((thing) => {
+      addThing(thing);
+    }).catch(() => {
+      console.error('WebSocket opened on nonexistent thing', thingId);
+      sendMessage({
+        messageType: Constants.ERROR,
+        data: {
+          code: 404,
+          status: '404 Not Found',
+          message: `Thing ${thingId} not found`,
+        },
+      });
+      websocket.close();
     });
-  }).catch(() => {
-    console.error('WebSocket opened on nonexistent thing', thingId);
-    sendMessage(JSON.stringify({
-      messageType: Constants.ERROR,
-      data: {
-        status: '404 Not Found',
-        message: `Thing ${thingId} not found`,
-      },
-    }));
-    websocket.close();
-  });
+  } else {
+    Things.getThings().then((things) => {
+      things.forEach(addThing);
+    });
+    Things.on(Constants.THING_ADDED, onThingAdded);
+  }
 
   AddonManager.on(Constants.PROPERTY_CHANGED, onPropertyChanged);
   Actions.on(Constants.ACTION_STATUS, onActionStatus);
@@ -477,8 +540,13 @@ ThingsController.ws('/:thingId/', (websocket, request) => {
   }, 30 * 1000);
 
   const cleanup = () => {
+    Things.removeListener(Constants.THING_ADDED, onThingAdded);
     AddonManager.removeListener(Constants.PROPERTY_CHANGED, onPropertyChanged);
     Actions.removeListener(Constants.ACTION_STATUS, onActionStatus);
+    for (const id in thingCleanups) {
+      thingCleanups[id]();
+    }
+    thingCleanups = {};
     clearInterval(heartbeatInterval);
   };
 
@@ -490,26 +558,42 @@ ThingsController.ws('/:thingId/', (websocket, request) => {
     try {
       request = JSON.parse(requestText);
     } catch (e) {
-      sendMessage(JSON.stringify({
+      sendMessage({
         messageType: Constants.ERROR,
         data: {
+          code: 400,
           status: '400 Bad Request',
           message: 'Parsing request failed',
         },
-      }));
+      });
       return;
     }
 
-    const device = AddonManager.getDevice(thingId);
-    if (!device) {
-      sendMessage(JSON.stringify({
+    const id = request.id || thingId;
+    if (typeof id === 'undefined') {
+      sendMessage({
         messageType: Constants.ERROR,
         data: {
+          code: 400,
           status: '400 Bad Request',
-          message: `Thing ${thingId} not found`,
+          message: 'Missing thing id',
           request,
         },
-      }));
+      });
+      return;
+    }
+
+    const device = AddonManager.getDevice(id);
+    if (!device) {
+      sendMessage({
+        messageType: Constants.ERROR,
+        data: {
+          code: 400,
+          status: '400 Bad Request',
+          message: `Thing ${id} not found`,
+          request,
+        },
+      });
       return;
     }
 
@@ -521,14 +605,15 @@ ThingsController.ws('/:thingId/', (websocket, request) => {
         });
         Promise.all(setRequests).catch((err) => {
           // If any set fails, send an error
-          sendMessage(JSON.stringify({
+          sendMessage({
             messageType: Constants.ERROR,
             data: {
+              code: 400,
               status: '400 Bad Request',
               message: err,
               request,
             },
-          }));
+          });
         });
         break;
       }
@@ -543,39 +628,41 @@ ThingsController.ws('/:thingId/', (websocket, request) => {
       case Constants.REQUEST_ACTION: {
         for (const actionName in request.data) {
           const actionParams = request.data[actionName].input;
-          Things.getThing(thingId).then((thing) => {
+          Things.getThing(id).then((thing) => {
             const action = new Action(actionName, actionParams, thing);
             return Actions.add(action).then(() => {
               return AddonManager.requestAction(
-                thingId, action.id, actionName, actionParams);
+                id, action.id, actionName, actionParams);
             });
           }).catch((err) => {
-            sendMessage(JSON.stringify({
+            sendMessage({
               messageType: Constants.ERROR,
               data: {
+                code: 400,
                 status: '400 Bad Request',
                 message: err.message,
                 request,
               },
-            }));
+            });
           });
         }
         break;
       }
 
       default: {
-        sendMessage(JSON.stringify({
+        sendMessage({
           messageType: Constants.ERROR,
           data: {
+            code: 400,
             status: '400 Bad Request',
             message: `Unknown messageType: ${request.messageType}`,
             request,
           },
-        }));
+        });
         break;
       }
     }
   });
-});
+}
 
 module.exports = ThingsController;

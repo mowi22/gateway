@@ -10,6 +10,7 @@
 
 const child_process = require('child_process');
 const fs = require('fs');
+const ipRegex = require('ip-regex');
 const os = require('os');
 
 /**
@@ -97,6 +98,14 @@ function getLanMode() {
 function setLanMode(mode, options = {}) {
   const valid = ['static', 'dhcp'];
   if (!valid.includes(mode)) {
+    return false;
+  }
+
+  const regex = ipRegex({exact: true});
+  if ((options.ipaddr && !regex.test(options.ipaddr)) ||
+      (options.netmask && !regex.test(options.netmask)) ||
+      (options.gateway && !regex.test(options.gateway)) ||
+      (options.dns && options.dns.filter((d) => !regex.test(d)).length > 0)) {
     return false;
   }
 
@@ -277,6 +286,11 @@ function setWirelessMode(enabled, mode = 'ap', options = {}) {
     return false;
   }
 
+  const regex = ipRegex({exact: true});
+  if (options.ipaddr && !regex.test(options.ipaddr)) {
+    return false;
+  }
+
   // First, remove existing networks
   let proc = child_process.spawnSync(
     'wpa_cli',
@@ -438,6 +452,15 @@ function setWirelessMode(enabled, mode = 'ap', options = {}) {
     );
     if (proc.status !== 0) {
       return false;
+    }
+
+    if (mode === 'ap') {
+      // set up a default route when running in AP mode. ignore errors here and
+      // just try to move on.
+      child_process.spawnSync(
+        'sudo',
+        ['ip', 'route', 'add', 'default', 'via', options.ipaddr, 'dev', 'wlan0']
+      );
     }
   }
 

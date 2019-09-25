@@ -13,15 +13,14 @@ const Model = require('./model');
 const Constants = require('../constants');
 
 class ThingModel extends Model {
-  constructor(description) {
+  constructor(description, ws) {
     super();
     this.title = description.title;
     this.type = description.type;
+    this.descrId = description.id;
     this.properties = {};
     this.events = [];
     this.connected = false;
-    this.closingWs = false;
-    this.wsBackoff = 1000;
 
     // Parse base URL of Thing
     if (description.href) {
@@ -61,7 +60,7 @@ class ThingModel extends Model {
       }
     }
 
-    this.initWebsocket();
+    this.initWebSocket(ws);
 
     this.updateEvents();
     this.updateProperties();
@@ -127,27 +126,20 @@ class ThingModel extends Model {
   /**
    * Initialize websocket.
    */
-  initWebsocket() {
-    if (this.closingWs) {
-      return;
-    }
-
+  initWebSocket(globalWs) {
     if (!this.hasOwnProperty('href')) {
       return;
     }
 
-    const wsHref = this.href.href.replace(/^http/, 'ws');
-    this.ws = new WebSocket(`${wsHref}?jwt=${API.jwt}`);
+    this.ws = globalWs;
 
     // After the websocket is open, add subscriptions for all events.
     this.ws.addEventListener('open', () => {
-      // Reset the backoff period
-      this.wsBackoff = 1000;
-
       if (Object.keys(this.eventDescriptions).length == 0) {
         return;
       }
       const msg = {
+        id: this.descrId,
         messageType: 'addEventSubscription',
         data: {},
       };
@@ -155,11 +147,13 @@ class ThingModel extends Model {
         msg.data[name] = {};
       }
       this.ws.send(JSON.stringify(msg));
-    }, {once: true});
-
+    });
 
     const onEvent = (event) => {
       const message = JSON.parse(event.data);
+      if (message.hasOwnProperty('id') && message.id !== this.descrId) {
+        return;
+      }
       switch (message.messageType) {
         case 'propertyStatus':
           this.onPropertyStatus(message.data);
@@ -181,40 +175,7 @@ class ThingModel extends Model {
       }
     };
 
-    const cleanup = () => {
-      this.ws.removeEventListener('message', onEvent);
-      this.ws.removeEventListener('close', cleanup);
-      this.ws.removeEventListener('error', cleanup);
-      this.ws.close();
-      this.ws = null;
-
-      setTimeout(() => {
-        this.wsBackoff *= 2;
-        if (this.wsBackoff > 30000) {
-          this.wsBackoff = 30000;
-        }
-        this.initWebsocket();
-      }, this.wsBackoff);
-    };
-
     this.ws.addEventListener('message', onEvent);
-    this.ws.addEventListener('close', cleanup);
-    this.ws.addEventListener('error', cleanup);
-  }
-
-  /**
-   * Cleanup objects.
-   */
-  cleanup() {
-    this.closingWs = true;
-    if (this.ws !== null) {
-      if (this.ws.readyState === WebSocket.OPEN ||
-          this.ws.readyState === WebSocket.CONNECTING) {
-        this.ws.close();
-      }
-    }
-
-    super.cleanup();
   }
 
   subscribe(event, handler) {

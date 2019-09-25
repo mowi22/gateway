@@ -38,11 +38,13 @@ let LogsScreen;
 // eslint-disable-next-line prefer-const
 let Speech;
 
+const page = require('page');
 const shaka = require('shaka-player/dist/shaka-player.compiled');
 const MobileDragDrop = require('mobile-drag-drop/index.min');
 const ScrollBehavior = require('mobile-drag-drop/scroll-behaviour.min');
 const Notifications = require('./notifications');
 const Utils = require('./utils');
+const fluent = require('./fluent');
 
 const App = {
   /**
@@ -69,6 +71,19 @@ const App = {
    * Start WebThings Gateway app.
    */
   init: function() {
+    fluent.init();
+
+    // after loading fluent, we need to add a couple extra DOM elements
+    document.querySelector('#thing-title-icon').innerHTML = `
+      <webthing-custom-icon id="thing-title-custom-icon" class="hidden">
+      </webthing-custom-icon>`;
+    document.querySelector('#context-menu-heading-icon').innerHTML = `
+      <webthing-custom-icon id="context-menu-heading-custom-icon" class="hidden">
+      </webthing-custom-icon>`;
+    document.querySelector('#edit-thing-icon').innerHTML = `
+      <webthing-custom-icon id="edit-thing-custom-icon" class="hidden">
+      </webthing-custom-icon>`;
+
     // Load the shaka player polyfills
     shaka.polyfill.installAll();
     MobileDragDrop.polyfill({
@@ -101,7 +116,7 @@ const App = {
     this.views.rule = document.getElementById('rule-view');
     this.views.assistant = document.getElementById('assistant-view');
     this.views.logs = document.getElementById('logs-view');
-    this.currentView = 'things';
+    this.currentView = this.views.things;
     this.menuButton = document.getElementById('menu-button');
     this.menuButton.addEventListener('click', Menu.toggle.bind(Menu));
     this.overflowButton = document.getElementById('overflow-button');
@@ -123,8 +138,36 @@ const App = {
     this.wsBackoff = 1000;
     this.initWebSocket();
 
+    this.extensions = {};
+
     Menu.init();
     Router.init();
+
+    API.getExtensions().then((extensions) => {
+      for (const [key, value] of Object.entries(extensions)) {
+        for (const extension of value) {
+          if (extension.css) {
+            for (const path of extension.css) {
+              const link = document.createElement('link');
+              link.rel = 'stylesheet';
+              link.type = 'text/css';
+              link.href = `/extensions/${encodeURIComponent(key)}/${path}`;
+
+              document.head.appendChild(link);
+            }
+          }
+
+          if (extension.js) {
+            for (const path of extension.js) {
+              const script = document.createElement('script');
+              script.src = `/extensions/${encodeURIComponent(key)}/${path}`;
+
+              document.head.appendChild(script);
+            }
+          }
+        }
+      }
+    });
   },
 
   initWebSocket() {
@@ -185,7 +228,8 @@ const App = {
         this.connectivityOverlay.classList.add('hidden');
         this.messageArea.classList.remove('disconnected');
 
-        if (this.messageArea.innerText === 'Gateway Unreachable') {
+        if (this.messageArea.innerText ===
+            fluent.getMessage('gateway-unreachable')) {
           this.hidePersistentMessage();
         }
       }
@@ -194,7 +238,7 @@ const App = {
       if (++this.failedPings >= this.MAX_PING_FAILURES) {
         this.connectivityOverlay.classList.remove('hidden');
         this.messageArea.classList.add('disconnected');
-        this.showPersistentMessage('Gateway Unreachable');
+        this.showPersistentMessage(fluent.getMessage('gateway-unreachable'));
         this.pingerLastStatus = 'offline';
       }
     });
@@ -255,15 +299,57 @@ const App = {
     this.selectView('logs');
   },
 
+  registerExtension: function(extension) {
+    this.extensions[extension.id] = extension;
+
+    // Go ahead and draw a <section> for this extension to draw to, if it so
+    // chooses.
+    const escapedId = Utils.escapeHtmlForIdClass(extension.id);
+    const newSection = document.createElement('section');
+    newSection.id = `extension-${escapedId}-view`;
+    newSection.dataset.view = `extension-${escapedId}`;
+    newSection.classList.add('hidden');
+    document.body.appendChild(newSection);
+
+    return newSection;
+  },
+
+  showExtension: function(context) {
+    const extensionId = context.params.extensionId;
+
+    if (this.extensions.hasOwnProperty(extensionId)) {
+      this.extensions[extensionId].show();
+      this.selectView(
+        `extension-${Utils.escapeHtmlForIdClass(extensionId)}-view`
+      );
+    } else {
+      console.warn('Unknown extension:', extensionId);
+      page('/things');
+    }
+  },
+
   selectView: function(view) {
-    if (!this.views[view]) {
-      console.error('Tried to select view that didnt exist');
+    let el = null;
+    if (view.startsWith('extension-')) {
+      // load extensions at runtime
+      el = document.getElementById(view);
+    } else {
+      el = this.views[view];
+    }
+
+    if (!el) {
+      console.error('Tried to select view that didn\'t exist:', view);
       return;
     }
-    this.views[this.currentView].classList.remove('selected');
-    this.views[view].classList.add('selected');
+
+    this.currentView.classList.add('hidden');
+    this.currentView.classList.remove('selected');
+
+    el.classList.remove('hidden');
+    el.classList.add('selected');
+
     Menu.selectItem(view);
-    this.currentView = view;
+    this.currentView = el;
   },
 
   showMenuButton: function() {
@@ -307,7 +393,7 @@ const App = {
       if (link.icon) {
         const image = document.createElement('img');
         image.src = link.icon;
-        image.alt = `${link.name} icon`;
+        image.alt = `${link.name} ${fluent.getMessage('icon')}`;
         element.insertBefore(image, element.childNodes[0]);
       }
 
@@ -355,8 +441,7 @@ const App = {
 
     if (extraUrl) {
       message += `<br><br>
-        <a href="${Utils.escapeHtml(extraUrl)}" target="_blank" rel="noopener">
-          More Information
+        <a href="${Utils.escapeHtml(extraUrl)}" target="_blank" rel="noopener" data-l10n-id="more-information">
         </a>`;
     }
 
@@ -438,6 +523,8 @@ require('./components/property/temperature');
 require('./components/property/video');
 require('./components/property/voltage');
 
+require('./extension');
+
 if (navigator.serviceWorker) {
   navigator.serviceWorker.register('/service-worker.js', {
     scope: '/',
@@ -450,5 +537,7 @@ if (navigator.serviceWorker) {
   */
 window.addEventListener('load', function app_onLoad() {
   window.removeEventListener('load', app_onLoad);
-  App.init();
+  fluent.load().then(() => {
+    App.init();
+  });
 });

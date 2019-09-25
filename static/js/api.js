@@ -221,7 +221,23 @@ const API = {
     });
   },
 
-  setAddonConfig: (addonName, config) => {
+  getAddonConfig: (addonId) => {
+    const headers = {
+      Authorization: `Bearer ${API.jwt}`,
+      Accept: 'application/json',
+    };
+    return fetch(`/addons/${encodeURIComponent(addonId)}/config`, {
+      headers,
+    }).then((response) => {
+      if (!response.ok) {
+        throw new Error(
+          'Unexpected response code while getting add-on config');
+      }
+      return response.json();
+    });
+  },
+
+  setAddonConfig: (addonId, config) => {
     const headers = {
       Authorization: `Bearer ${API.jwt}`,
       Accept: 'application/json',
@@ -231,7 +247,7 @@ const API = {
       config,
     };
     const body = JSON.stringify(payload);
-    return fetch(`/addons/${encodeURIComponent(addonName)}/config`, {
+    return fetch(`/addons/${encodeURIComponent(addonId)}/config`, {
       method: 'PUT',
       body,
       headers,
@@ -243,7 +259,7 @@ const API = {
     });
   },
 
-  setAddonSetting: (addonName, enabled) => {
+  setAddonSetting: (addonId, enabled) => {
     const headers = {
       Authorization: `Bearer ${API.jwt}`,
       Accept: 'application/json',
@@ -252,7 +268,7 @@ const API = {
     const payload = {
       enabled,
     };
-    return fetch(`/addons/${encodeURIComponent(addonName)}`, {
+    return fetch(`/addons/${encodeURIComponent(addonId)}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
       headers,
@@ -264,14 +280,14 @@ const API = {
     });
   },
 
-  installAddon: (addonName, addonUrl, addonChecksum) => {
+  installAddon: (addonId, addonUrl, addonChecksum) => {
     const headers = {
       Authorization: `Bearer ${API.jwt}`,
       Accept: 'application/json',
       'Content-Type': 'application/json',
     };
     const payload = {
-      name: addonName,
+      id: addonId,
       url: addonUrl,
       checksum: addonChecksum,
     };
@@ -287,13 +303,13 @@ const API = {
     });
   },
 
-  uninstallAddon: (addonName) => {
+  uninstallAddon: (addonId) => {
     const headers = {
       Authorization: `Bearer ${API.jwt}`,
       Accept: 'application/json',
       'Content-Type': 'application/json',
     };
-    return fetch(`/addons/${encodeURIComponent(addonName)}`, {
+    return fetch(`/addons/${encodeURIComponent(addonId)}`, {
       method: 'DELETE',
       headers,
     }).then((response) => {
@@ -304,7 +320,7 @@ const API = {
     });
   },
 
-  updateAddon: (addonName, addonUrl, addonChecksum) => {
+  updateAddon: (addonId, addonUrl, addonChecksum) => {
     const headers = {
       Authorization: `Bearer ${API.jwt}`,
       Accept: 'application/json',
@@ -314,7 +330,7 @@ const API = {
       url: addonUrl,
       checksum: addonChecksum,
     };
-    return fetch(`/addons/${encodeURIComponent(addonName)}`, {
+    return fetch(`/addons/${encodeURIComponent(addonId)}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
       headers,
@@ -392,8 +408,17 @@ const API = {
       return res.json();
     });
   },
+
+  getExtensions: function() {
+    return fetch('/extensions', {
+      headers: this.headers(),
+    }).then((res) => {
+      return res.json();
+    });
+  },
 };
 
+// Elevate this to the window level.
 window.API = API;
 
 module.exports = API;

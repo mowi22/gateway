@@ -8,15 +8,18 @@
 /**
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.*
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
 'use strict';
 
+const appInstance = require('../app-instance');
+const config = require('config');
 const Constants = require('../constants');
 const EventEmitter = require('events');
-const IpcSocket = require('./ipc');
+const {IpcSocket} = require('gateway-addon');
 const Plugin = require('./plugin');
+const UserProfile = require('../user-profile');
 
 class PluginServer extends EventEmitter {
   constructor(addonManager, {verbose} = {}) {
@@ -27,8 +30,10 @@ class PluginServer extends EventEmitter {
     this.plugins = new Map();
 
     this.ipcSocket = new IpcSocket('PluginServer', 'rep',
+                                   config.get('ipc.protocol'),
                                    'gateway.addonManager',
-                                   this.onMsg.bind(this));
+                                   this.onMsg.bind(this),
+                                   appInstance.get());
     this.ipcSocket.bind();
     this.verbose &&
       console.log('Server bound to', this.ipcSocket.ipcAddr);
@@ -53,6 +58,15 @@ class PluginServer extends EventEmitter {
   }
 
   /**
+   * @method addAPIHandler
+   *
+   * Tells the add-on manager about new API handlers added via a plugin.
+   */
+  addAPIHandler(handler) {
+    this.manager.addAPIHandler(handler);
+  }
+
+  /**
    * @method onMsg
    *
    * Called when the plugin server receives an adapter manager IPC message
@@ -71,6 +85,13 @@ class PluginServer extends EventEmitter {
           data: {
             pluginId: msg.data.pluginId,
             ipcBaseAddr: plugin.ipcBaseAddr,
+            userProfile: {
+              baseDir: UserProfile.baseDir,
+              configDir: UserProfile.configDir,
+              mediaDir: UserProfile.mediaDir,
+              logDir: UserProfile.logDir,
+              gatewayDir: UserProfile.gatewayDir,
+            },
           },
         });
         break;

@@ -385,7 +385,7 @@ const RuleScreen = {
       circleTrigger.setAttribute('r', 6);
       circleTrigger.setAttribute('cx', triggerCoords.x);
       circleTrigger.setAttribute('cy', triggerCoords.y);
-      this.connection.appendChild(circleTrigger);
+      this.connection.insertBefore(circleTrigger, this.connection.firstChild);
 
       if (!multiTrigger) {
         // Path already drawn by effects
@@ -676,7 +676,7 @@ const RuleScreen = {
         const noBlock = this.makeBlock(
           'notifier-outlet-block',
           '/optimized-images/thing-icons/notification.svg',
-          outlet.name);
+          `${outlet.name} Notification`);
         const onNotifierOutletBlockDown =
           this.onBlockDown.bind(
             this,

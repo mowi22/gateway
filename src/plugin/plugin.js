@@ -6,44 +6,55 @@
 /**
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.*
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
 'use strict';
 
 const AdapterProxy = require('./adapter-proxy');
+const APIHandlerProxy = require('./api-handler-proxy');
+const appInstance = require('../app-instance');
 const config = require('config');
 const Constants = require('../constants');
+const db = require('../db');
 const Deferred = require('../deferred');
 const DeviceProxy = require('./device-proxy');
 const format = require('string-format');
-const IpcSocket = require('./ipc');
+const {IpcSocket} = require('gateway-addon');
 const NotifierProxy = require('./notifier-proxy');
 const OutletProxy = require('./outlet-proxy');
 const path = require('path');
 const readline = require('readline');
+const Settings = require('../models/settings');
 const spawn = require('child_process').spawn;
 const UserProfile = require('../user-profile');
 
 const DEBUG = false;
 
+db.open();
+
 class Plugin {
 
-  constructor(pluginId, pluginServer) {
+  constructor(pluginId, pluginServer, forceEnable = false) {
     this.pluginId = pluginId;
     this.pluginServer = pluginServer;
     this.logPrefix = pluginId.replace('-adapter', '');
 
     this.adapters = new Map();
     this.notifiers = new Map();
+    this.apiHandlers = new Map();
     this.ipcBaseAddr = `gateway.plugin.${this.pluginId}`;
 
     this.ipcSocket = new IpcSocket('AdapterProxy', 'pair',
+                                   config.get('ipc.protocol'),
                                    this.ipcBaseAddr,
-                                   this.onMsg.bind(this));
+                                   this.onMsg.bind(this),
+                                   appInstance.get());
     this.ipcSocket.bind();
     this.exec = '';
     this.execPath = '.';
+    this.forceEnable = forceEnable;
+    this.startPromise = null;
 
     // Make this a nested object such that if the Plugin object is reused,
     // i.e. the plugin is disabled and quickly re-enabled, the gateway process
@@ -63,6 +74,7 @@ class Plugin {
     this.setPinPromises = new Map();
     this.setCredentialsPromises = new Map();
     this.notifyPromises = new Map();
+    this.apiRequestPromises = new Map();
   }
 
   asDict() {
@@ -239,11 +251,25 @@ class Plugin {
         this.setCredentialsPromises.delete(messageId);
         return;
       }
+      case Constants.API_RESPONSE: {
+        const messageId = msg.data.messageId;
+        const deferred = this.apiRequestPromises.get(messageId);
+        if (typeof messageId === 'undefined' ||
+            typeof deferred === 'undefined') {
+          console.error('Plugin:', this.pluginId,
+                        'Unrecognized message id:', messageId,
+                        'Ignoring msg:', msg);
+          return;
+        }
+        deferred.resolve(msg.data.response);
+        this.apiRequestPromises.delete(messageId);
+        return;
+      }
     }
 
     const adapterId = msg.data.adapterId;
     const notifierId = msg.data.notifierId;
-    let adapter, notifier;
+    let adapter, notifier, apiHandler;
 
     // The second switch manages plugin level messages.
     switch (msg.messageType) {
@@ -267,6 +293,40 @@ class Plugin {
         this.pluginServer.addNotifier(notifier);
         return;
 
+      case Constants.ADD_API_HANDLER:
+        apiHandler = new APIHandlerProxy(this.pluginServer.manager,
+                                         msg.data.packageName,
+                                         this);
+        this.apiHandlers.set(msg.data.packageName, apiHandler);
+        this.pluginServer.addAPIHandler(apiHandler);
+        return;
+
+      case Constants.API_HANDLER_UNLOADED: {
+        const packageName = msg.data.packageName;
+        const handler = this.handlers.get(packageName);
+
+        if (!handler) {
+          console.error('Plugin:', this.pluginId,
+                        'Unrecognized API handler:', packageName,
+                        'Ignoring msg:', msg);
+          return;
+        }
+
+        this.apiHandlers.delete(packageName);
+        if (this.adapters.size === 0 &&
+            this.notifiers.size === 0 &&
+            this.apiHandlers.size === 0) {
+          // We've unloaded everything for the plugin, now unload the plugin.
+          this.unload();
+          this.unloadCompletedPromise = handler.unloadCompletedPromise;
+          handler.unloadCompletedPromise = null;
+        } else if (handler.unloadCompletedPromise) {
+          handler.unloadCompletedPromise.resolve();
+          handler.unloadCompletedPromise = null;
+        }
+
+        return;
+      }
       case Constants.PLUGIN_UNLOADED:
         this.shutdown();
         this.pluginServer.unregisterPlugin(msg.data.pluginId);
@@ -328,9 +388,10 @@ class Plugin {
 
       case Constants.ADAPTER_UNLOADED:
         this.adapters.delete(adapterId);
-        if (this.adapters.size == 0) {
-          // We've unloaded the last adapter for the plugin, now unload
-          // the plugin.
+        if (this.adapters.size === 0 &&
+            this.notifiers.size === 0 &&
+            this.apiHandlers.size === 0) {
+          // We've unloaded everything for the plugin, now unload the plugin.
 
           // We may need to reevaluate this, and only auto-unload
           // the plugin for the MockAdapter. For plugins which
@@ -347,9 +408,10 @@ class Plugin {
 
       case Constants.NOTIFIER_UNLOADED:
         this.notifiers.delete(notifierId);
-        if (this.notifiers.size == 0) {
-          // We've unloaded the last notifier for the plugin, now unload
-          // the plugin.
+        if (this.adapters.size === 0 &&
+            this.notifiers.size === 0 &&
+            this.apiHandlers.size === 0) {
+          // We've unloaded everything for the plugin, now unload the plugin.
           this.unload();
           this.unloadCompletedPromise = notifier.unloadCompletedPromise;
           notifier.unloadCompletedPromise = null;
@@ -544,6 +606,11 @@ class Plugin {
           this.setCredentialsPromises.set(data.messageId, deferred);
           break;
         }
+        case Constants.API_REQUEST: {
+          data.messageId = this.generateMsgId();
+          this.apiRequestPromises.set(data.messageId, deferred);
+          break;
+        }
         default:
           break;
       }
@@ -586,102 +653,128 @@ class Plugin {
       promise.reject();
       this.notifyPromises.delete(key);
     });
+    this.apiRequestPromises.forEach((promise, key) => {
+      promise.reject();
+      this.apiRequestPromises.delete(key);
+    });
     this.ipcSocket.close();
   }
 
   start() {
-    const execArgs = {
-      nodeLoader: `node ${path.join(UserProfile.gatewayDir,
-                                    'src',
-                                    'addon-loader.js')}`,
-      name: this.pluginId,
-      path: this.execPath,
-    };
-    const execCmd = format(this.exec, execArgs);
+    const key = `addons.${this.pluginId}`;
 
-    DEBUG && console.log('  Launching:', execCmd);
-
-    // If we need embedded spaces, then consider changing to use the npm
-    // module called splitargs
-    this.restart = true;
-    const args = execCmd.split(' ');
-    this.process.p = spawn(
-      args[0],
-      args.slice(1),
-      {
-        env: Object.assign(process.env,
-                           {
-                             MOZIOT_HOME: UserProfile.baseDir,
-                             NODE_PATH: path.join(UserProfile.gatewayDir,
-                                                  'node_modules'),
-                           }),
-      }
-    );
-
-    this.process.p.on('error', (err) => {
-      // We failed to spawn the process. This most likely means that the
-      // exec string is malformed somehow. Report the error but don't try
-      // restarting.
-      this.restart = false;
-      console.error('Failed to start plugin', this.pluginId);
-      console.error('Command:', this.exec);
-      console.error(err);
-    });
-
-    this.stdoutReadline = readline.createInterface({
-      input: this.process.p.stdout,
-    });
-    this.stdoutReadline.on('line', (line) => {
-      console.log(`${this.logPrefix}: ${line}`);
-    });
-
-    this.stderrReadline = readline.createInterface({
-      input: this.process.p.stderr,
-    });
-    this.stderrReadline.on('line', (line) => {
-      console.error(`${this.logPrefix}: ${line}`);
-    });
-
-    this.process.p.on('exit', (code) => {
-      if (this.restart) {
-        if (code == Constants.DONT_RESTART_EXIT_CODE) {
-          console.log('Plugin:', this.pluginId, 'died, code =', code,
-                      'NOT restarting...');
-          this.restart = false;
-          this.process.p = null;
-        } else {
-          if (this.pendingRestart) {
-            return;
-          }
-          if (this.restartDelay < 30 * 1000) {
-            this.restartDelay += 1000;
-          }
-          if (this.lastRestart + 60 * 1000 < Date.now()) {
-            this.restartDelay = 0;
-          }
-          console.log('Plugin:', this.pluginId, 'died, code =', code,
-                      'restarting after', this.restartDelay);
-          const doRestart = () => {
-            if (this.restart) {
-              this.lastRestart = Date.now();
-              this.pendingRestart = null;
-              this.start();
-            } else {
-              this.process.p = null;
-            }
-          };
-          if (this.restartDelay > 0) {
-            this.pendingRestart = setTimeout(doRestart, this.restartDelay);
-          } else {
-            // Restart immediately so that test code can access
-            // process.p
-            doRestart();
-          }
-        }
-      } else {
+    this.startPromise = Settings.get(key).then((savedSettings) => {
+      if (!this.forceEnable &&
+          (!savedSettings || !savedSettings.enabled)) {
+        console.error(`Plugin ${this.pluginId} not enabled, so not starting.`);
+        this.restart = false;
         this.process.p = null;
+        return;
       }
+
+      const execArgs = {
+        nodeLoader: `node ${path.join(UserProfile.gatewayDir,
+                                      'src',
+                                      'addon-loader.js')}`,
+        name: this.pluginId,
+        path: this.execPath,
+      };
+      const execCmd = format(this.exec, execArgs);
+
+      DEBUG && console.log('  Launching:', execCmd);
+
+      // If we need embedded spaces, then consider changing to use the npm
+      // module called splitargs
+      this.restart = true;
+      const args = execCmd.split(' ');
+      this.process.p = spawn(
+        args[0],
+        args.slice(1),
+        {
+          env: Object.assign(process.env,
+                             {
+                               MOZIOT_HOME: UserProfile.baseDir,
+                               NODE_PATH: path.join(UserProfile.gatewayDir,
+                                                    'node_modules'),
+                             }),
+        }
+      );
+
+      this.process.p.on('error', (err) => {
+        // We failed to spawn the process. This most likely means that the
+        // exec string is malformed somehow. Report the error but don't try
+        // restarting.
+        this.restart = false;
+        console.error('Failed to start plugin', this.pluginId);
+        console.error('Command:', this.exec);
+        console.error(err);
+      });
+
+      this.stdoutReadline = readline.createInterface({
+        input: this.process.p.stdout,
+      });
+      this.stdoutReadline.on('line', (line) => {
+        console.log(`${this.logPrefix}: ${line}`);
+      });
+
+      this.stderrReadline = readline.createInterface({
+        input: this.process.p.stderr,
+      });
+      this.stderrReadline.on('line', (line) => {
+        console.error(`${this.logPrefix}: ${line}`);
+      });
+
+      this.process.p.on('exit', (code) => {
+        if (this.restart) {
+          if (code == Constants.DONT_RESTART_EXIT_CODE) {
+            console.log('Plugin:', this.pluginId, 'died, code =', code,
+                        'NOT restarting...');
+            this.restart = false;
+            this.process.p = null;
+          } else {
+            if (this.pendingRestart) {
+              return;
+            }
+            if (this.restartDelay < 30 * 1000) {
+              this.restartDelay += 1000;
+            }
+            if (this.lastRestart + 60 * 1000 < Date.now()) {
+              this.restartDelay = 0;
+            }
+            if (this.restartDelay > 30000) {
+              // If we've restarted 30 times in a row, this is probably just
+              // not going to work, so bail out.
+              console.log(`Giving up on restarting plugin ${this.pluginId}`);
+              this.restart = false;
+              this.process.p = null;
+              return;
+            }
+            console.log('Plugin:', this.pluginId, 'died, code =', code,
+                        'restarting after', this.restartDelay);
+            const doRestart = () => {
+              if (this.restart) {
+                this.lastRestart = Date.now();
+                this.pendingRestart = null;
+                this.start();
+              } else {
+                this.process.p = null;
+              }
+            };
+            if (this.restartDelay > 0) {
+              this.pendingRestart = setTimeout(doRestart, this.restartDelay);
+            } else {
+              // Restart immediately so that test code can access
+              // process.p
+              doRestart();
+            }
+          }
+        } else {
+          this.process.p = null;
+        }
+      });
     });
+
+    return this.startPromise;
   }
 
   unload() {

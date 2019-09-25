@@ -11,6 +11,7 @@
 const child_process = require('child_process');
 const config = require('config');
 const fs = require('fs');
+const ipRegex = require('ip-regex');
 const os = require('os');
 const parse = require('csv-parse/lib/sync');
 
@@ -366,6 +367,11 @@ function getCaptivePortalStatus() {
  * @returns {boolean} Boolean indicating success of the command.
  */
 function setCaptivePortalStatus(enabled, options = {}) {
+  const regex = ipRegex({exact: true});
+  if (options.ipaddr && !regex.test(options.ipaddr)) {
+    return false;
+  }
+
   const label = 'setCaptivePortalStatus';
   DEBUG && console.log(`${label}: enabled`, enabled, 'options:', options);
   const httpSrcPort = 80;
@@ -378,7 +384,6 @@ function setCaptivePortalStatus(enabled, options = {}) {
         return false;
       }
     }
-
     if (!isRedirectedTcpPort(httpsSrcPort, httpsDstPort)) {
       if (!redirectTcpPort(enabled, options.ipaddr,
                            httpsSrcPort, httpsDstPort)) {
@@ -396,27 +401,12 @@ function setCaptivePortalStatus(enabled, options = {}) {
     addresses = [];
   }
   addresses = addresses.filter((value) => {
-    if (options.manualDnsAddresses) {
-      for (const opt of options.manualDnsAddresses) {
-        if (value.startsWith(`/${opt.host}/`)) {
-          return false;
-        }
-      }
-    }
-
     return !value.startsWith('/#/');
   });
 
   if (enabled) {
-    if (options.manualDnsAddresses) {
-      for (const opt of options.manualDnsAddresses) {
-        addresses.unshift(`/${opt.host}/${opt.address}`);
-      }
-    }
-
     addresses.unshift(`/#/${options.ipaddr}`);
   }
-
   // If addresses is an empty array, then uciSet will wind up deleting
   // the entry.
   if (!uciSet(label, 'dhcp.@dnsmasq[0].address', addresses)) {
@@ -560,6 +550,14 @@ function setLanMode(mode, options = {}) {
     return false;
   }
 
+  const regex = ipRegex({exact: true});
+  if ((options.ipaddr && !regex.test(options.ipaddr)) ||
+      (options.netmask && !regex.test(options.netmask)) ||
+      (options.gateway && !regex.test(options.gateway)) ||
+      (options.dns && options.dns.filter((d) => !regex.test(d)).length > 0)) {
+    return false;
+  }
+
   if (!uciSet(label, 'network.lan.proto', mode)) {
     return false;
   }
@@ -624,6 +622,14 @@ function setWanMode(mode, options = {}) {
   DEBUG && console.log('setWanMode: mode:', mode, 'options:', options);
   const valid = ['static', 'dhcp', 'pppoe'];
   if (!valid.includes(mode)) {
+    return false;
+  }
+
+  const regex = ipRegex({exact: true});
+  if ((options.ipaddr && !regex.test(options.ipaddr)) ||
+      (options.netmask && !regex.test(options.netmask)) ||
+      (options.gateway && !regex.test(options.gateway)) ||
+      (options.dns && options.dns.filter((d) => !regex.test(d)).length > 0)) {
     return false;
   }
 
@@ -748,6 +754,11 @@ function setWirelessMode(enabled, mode = 'ap', options = {}) {
   DEBUG && console.log(`${label}: enabled:`, enabled, 'mode:', mode);
   const valid = ['ap', 'sta'];
   if (enabled && !valid.includes(mode)) {
+    return false;
+  }
+
+  const regex = ipRegex({exact: true});
+  if (options.ipaddr && !regex.test(options.ipaddr)) {
     return false;
   }
 
